@@ -1,7 +1,3 @@
-Ecco la versione aggiornata con l'evidenza dedicata al **riconoscimento automatico dell'hardware** previsto nella prossima release:
-
----
-
 # 🚀 Gideon-AI: Universal AI Connector & Local/Cloud GUI
 
 ## 📌 Visione del Progetto
