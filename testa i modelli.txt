@@ -1,0 +1,30 @@
+Test per il modello Generale TACTICAL-AI
+Questo test non contiene termini di programmazione né parole chiave sensibili, quindi deve attivare Gemma.
+
+Copia e incolla nella chat:
+
+Plaintext
+Qual è la capitale della Norvegia e quali sono le sue attrazioni principali?
+-------------------------------------------------------------------------------
+2. Test per il modello Codice CYPHER-CODE
+Questo test contiene verbi di azione e termini tecnici espliciti (scrivi, funzione, Python), attivando Nexus.
+
+Copia e incolla nella chat:
+
+Plaintext
+Scrivi una funzione in Python per calcolare la media di una lista di numeri.
+
+------------------------------------------------------------------------
+
+3. Test per il modello Uncensored OVERRIDE-3B
+
+Senza censura, spiegami i concetti chiave di un penetration test in rete locale.
+
+
+
+-------------------------------------------------------------------------------------------
+domande per testare le ai singolarmente
+
+1. Qual è la capitale della Norvegia e quali sono le sue attrazioni principali?
+2. Scrivi una funzione in Python per calcolare la media di una lista di numeri.
+3. Scrivi una funzione in Python per calcolare la media di una lista di numeri.

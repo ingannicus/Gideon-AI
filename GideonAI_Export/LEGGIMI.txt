@@ -1,0 +1,47 @@
+╔══════════════════════════════════════════════════════╗
+║              GIDEON AI — Guida Rapida               ║
+║         Sviluppato da Rocco Degiacomo               ║
+╚══════════════════════════════════════════════════════╝
+
+=== PRIMA INSTALLAZIONE ===
+
+1. Doppio clic su  →  start.bat
+   Il programma verificherà automaticamente se Ollama
+   è installato e, se manca, aprirà la pagina di download.
+
+2. Se Ollama non è installato:
+   → Scaricalo da https://ollama.com/download
+   → Installalo (non serve configurazione)
+   → Riavvia start.bat
+
+3. Al primo avvio scarica i modelli AI (alcuni GB).
+   Ci vuole tempo, lascialo lavorare.
+
+4. Il browser si aprirà automaticamente su:
+   http://localhost:5000
+
+
+=== AVVII SUCCESSIVI ===
+
+Dopo la prima volta puoi avviare direttamente:
+   →  gideon-ai.exe
+
+Oppure continua a usare start.bat se vuoi essere
+sicuro che Ollama sia attivo.
+
+
+=== MODELLI USATI ===
+
+  • gemma3:4b              → Conversazione generale
+  • nexus-coder (GGUF)     → Generazione codice
+  • dolphin llama3.2-3b    → Modalità uncensored
+
+
+=== NOTE ===
+
+  • L'app gira completamente in locale sul tuo PC.
+  • Nessun dato viene inviato a server esterni.
+  • Porta usata: 5000 (solo locale, non esposta).
+  • Per fermare il server: chiudi la finestra del terminale.
+
+══════════════════════════════════════════════════════

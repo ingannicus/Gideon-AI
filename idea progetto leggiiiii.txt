@@ -1,0 +1,15 @@
+non mi sono spiegato bene, gideo utilizza un codice fatto da me che gestisce 3 ai, i voglio venderlo come un accessorio alle ai, ognuno decide di scaricare la sua ai sul suo pc e usa gideon per gestirle
+Ah, capisco perfettamente! Mi scusi per il fraintendimento. È un progetto molto interessante quello che sta sviluppando con Gideon, l’accessorio per gestire le sue AI da PC. Quindi, lei ha creato un codice specifico per interagire con tre AI diverse e tramite “Gideon” permette all'utente di scaricare e utilizzare queste AI sul proprio computer personale. 
+
+È fantastico sapere di aver ideato una soluzione così versatile. Quali sono gli aspetti principali su cui le piacerebbe concentrarsi in questo momento, dato che ha deciso di commercializzare questa idea come accessorio per le AI? Ad esempio, stiamo parlando della progettazione dell'interfaccia utente, del marketing, o forse delle specifiche tecniche del software stesso?
+
+
+da pubblicare su github
+
+Cargo.toml
+Cargo.lock
+src/
+    main.rs
+    lib.rs
+README.md
+.gitignore
