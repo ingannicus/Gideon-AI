@@ -4,8 +4,9 @@
 
 ![Rust](https://img.shields.io/badge/Backend-Rust-orange?style=flat-square&logo=rust)
 ![Ollama](https://img.shields.io/badge/Engine-Ollama-black?style=flat-square)
-![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-blue?style=flat-square)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
+![Version](https://img.shields.io/badge/Version-4.0-purple?style=flat-square)
 
 ---
 
@@ -21,18 +22,53 @@ Smista automaticamente le richieste al modello più adatto:
 | Scrittura e analisi codice | `qwen2.5-coder:3b` |
 | Sicurezza informatica | `gemma3:4b` (system prompt dedicato) |
 | Modalità uncensored | `dolphin llama3.2-3b-uncensored` |
+| Qualsiasi modello HuggingFace | scelto e scaricato in autonomia |
 
 ---
 
-## Funzionalità
+## Funzionalità v4
 
-- **Routing intelligente** — rileva automaticamente se la richiesta riguarda codice, sicurezza o conversazione e sceglie il modello giusto
-- **Streaming in tempo reale** — le risposte appaiono parola per parola, come ChatGPT
+### 💻 Auto-Hardware Detection
+All'avvio, Gideon scansiona automaticamente CPU, RAM e GPU del PC ospite e calcola:
+- La **quantizzazione GGUF ottimale** in base alla RAM disponibile
+- I **thread e il context window** ideali per l'hardware rilevato
+- Il **tier di potenza** (High / Mid / Low) visualizzato nell'interfaccia
+
+| RAM libera per modelli | Quantizzazione consigliata |
+|---|---|
+| ≥ 12 GB | Q8_0 (qualità massima) |
+| ≥ 8 GB | Q6_K (ottima qualità) |
+| ≥ 5.5 GB | Q5_K_M (alta qualità) |
+| ≥ 3.5 GB | Q4_K_M (uso generale, consigliata) |
+| ≥ 2.5 GB | Q3_K_M (compressa) |
+| < 2.5 GB | IQ2_M (ultra-leggera) |
+
+### 🔍 GGUF Picker — selezione guidata del modello
+1. Inserisci un repo HuggingFace nel connettore (es. `bartowski/Phi-3-mini-4k-instruct-GGUF`)
+2. Premi **Scansiona** — Gideon interroga l'API HuggingFace e lista tutti i file `.gguf` disponibili
+3. Ogni file mostra: dimensione, RAM stimata richiesta, badge **COMPATIBILE / TROPPO GRANDE** e una stella sul file consigliato per il tuo hardware
+4. Puoi filtrare per quantizzazione (Q4, Q5, Q8, ecc.) e scaricare con un clic
+5. In alternativa, **Pull diretto (quant auto)** sceglie e scarica il file migliore in autonomia
+
+### 🔌 Connettore Universale
+- Dropdown con i modelli Ollama già installati — selezionane uno per usarlo subito
+- Pull da HuggingFace con selezione guidata o automatica
+- Il modello connesso diventa attivo per tutte le chat successive
+
+### 🎨 Interfaccia rinnovata
+- HUD animato canvas con effetti cyberpunk
+- Pannello hardware in tempo reale nella sidebar e nella topbar
+- Animazioni fluide sui messaggi
+- Badge modalità colorati (Generale / Codice / Sicurezza / Uncensored)
+- Tema scuro profondo ottimizzato per lunghe sessioni
+
+### Altre funzionalità
+- **Routing intelligente** — rileva automaticamente il tipo di richiesta
+- **Streaming in tempo reale** — le risposte appaiono parola per parola
 - **Bottone Stop** — interrompe la generazione in qualsiasi momento
-- **Download diretto** — scarica il codice generato come file `.py`, `.js`, `.rs`, ecc. con un clic
-- **Data contestuale** — il modello conosce sempre la data e l'ora reale
-- **HUD animato** — interfaccia terminale con canvas animato stile cyberpunk
-- **Multi-sessione** — pulsante per resettare la conversazione
+- **Download diretto** — scarica il codice generato come `.py`, `.js`, `.rs`, ecc.
+- **Data contestuale** — il modello conosce sempre data e ora reale
+- **Multi-sessione** — reset conversazione con un clic
 - **Privacy totale** — zero dati inviati all'esterno, tutto locale
 
 ---
@@ -41,16 +77,16 @@ Smista automaticamente le richieste al modello più adatto:
 
 | | Minimo | Consigliato |
 |---|---|---|
-| RAM | 8 GB | 16 GB |
-| Spazio disco | 10 GB | 15 GB |
-| CPU | Qualsiasi moderna | con GPU dedicata |
-| OS | Windows 10/11, macOS 12+ | — |
+| RAM | 4 GB | 16 GB |
+| Spazio disco | 5 GB | 20 GB |
+| CPU | Qualsiasi moderna | 8+ core |
+| OS | Windows 10/11, macOS 12+, Linux | — |
 
-> Con una GPU (anche GTX 1060 / RX 580) la velocità migliora di 10-20x.
+> Con una GPU (anche GTX 1060 / RX 580) la velocità migliora di 10–20x.
 
 ---
 
-## Installazione
+## Installazione rapida
 
 ### Windows
 
@@ -58,37 +94,45 @@ Smista automaticamente le richieste al modello più adatto:
 2. Estrai la cartella
 3. Doppio clic su **`start.bat`**
 
-Lo script verifica automaticamente se Ollama è installato, lo avvia, scarica i modelli AI e lancia l'app. Il browser si aprirà su `http://localhost:5000`.
+Lo script verifica automaticamente se Ollama è installato, lo avvia, scarica i modelli base e lancia l'app. Il browser si aprirà su `http://localhost:5000`.
 
 > **Avvii successivi:** doppio clic diretto su `Gideon AI.exe` oppure usa la shortcut `Avvia Gideon AI.lnk`.
 
----
-
 ### macOS
 
-1. Installa [Ollama](https://ollama.com/download) se non lo hai già
+1. Installa [Ollama](https://ollama.com/download)
 2. Scarica `GideonAI_Export_Mac.zip` dalla pagina [Releases](../../releases)
-3. Estrai la cartella
-4. Apri il Terminale nella cartella estratta e lancia:
+3. Estrai e lancia:
    ```bash
    chmod +x start.sh
    ./start.sh
    ```
-   Oppure doppio clic su **`Avvia Gideon AI.command`**
 
-> **Prima volta:** scarica circa 8GB di modelli, lascia lavorare.
+### Linux
+
+```bash
+# Installa Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Clona e compila
+git clone https://github.com/TUO_USERNAME/gideon-ai
+cd gideon-ai
+cargo run --release
+```
 
 ---
 
-## Modelli AI usati
+## Modelli AI base
 
-```
+Scaricati automaticamente al primo avvio da `start.bat` / `start.sh`:
+
+```bash
 ollama pull gemma3:4b
 ollama pull qwen2.5-coder:3b
 ollama pull dolphinlabs/llama3.2-3b-uncensored
 ```
 
-Vengono scaricati automaticamente dallo `start.bat` / `start.sh` al primo avvio.
+Puoi aggiungere **qualsiasi modello HuggingFace** direttamente dall'interfaccia — basta incollare l'ID del repo.
 
 ---
 
@@ -96,9 +140,9 @@ Vengono scaricati automaticamente dallo `start.bat` / `start.sh` al primo avvio.
 
 ### Prerequisiti
 
-- [Rust](https://rustup.rs/) (edizione 2021+)
+- [Rust](https://rustup.rs/) 1.75+
 - [Ollama](https://ollama.com/download)
-- Python 3 + Pillow (per generare l'icona su Windows)
+- Python 3 + Pillow (solo per generare l'icona su Windows)
   ```
   pip install Pillow
   ```
@@ -120,6 +164,46 @@ chmod +x build_rust.sh
 ./build_rust.sh
 ```
 
+### Avvio rapido (sviluppo)
+
+```bash
+cargo run
+```
+
+L'app si apre automaticamente su `http://localhost:5000`.
+
+---
+
+## Aggiungere un modello HuggingFace
+
+1. Avvia Gideon AI
+2. Nel pannello **🔌 CONNETTORE UNIVERSALE** inserisci l'ID del repo, per esempio:
+   ```
+   bartowski/Phi-3-mini-4k-instruct-GGUF
+   ```
+3. Premi **Scansiona** per vedere tutti i file disponibili con compatibilità calcolata
+4. Oppure premi **Pull diretto (quant auto)** per lasciare che Gideon scelga in autonomia
+
+Per fare pull manuale da terminale:
+```bash
+# Sintassi: hf.co/<org>/<repo>:<file.gguf>
+ollama pull hf.co/bartowski/Phi-3-mini-4k-instruct-GGUF:Phi-3-mini-4k-instruct-Q4_K_M.gguf
+```
+
+---
+
+## Route API interne
+
+| Metodo | Endpoint | Descrizione |
+|---|---|---|
+| `GET` | `/` | Interfaccia web |
+| `POST` | `/chat` | Invia un messaggio (streaming) |
+| `POST` | `/reset` | Resetta la cronologia |
+| `GET` | `/hw` | Info hardware rilevate |
+| `GET` | `/models` | Lista modelli Ollama installati |
+| `POST` | `/hf-files` | Lista file GGUF di un repo HuggingFace |
+| `POST` | `/connect` | Pull di un modello (Ollama o HuggingFace) |
+
 ---
 
 ## Struttura del progetto
@@ -129,13 +213,13 @@ gideon-ai/
 ├── src/
 │   └── main.rs          # Backend Rust + HTML/JS embedded
 ├── assets/
-│   ├── icon.ico         # Icona app Windows
-│   ├── icon.svg         # Sorgente icona
-│   ├── make_icon.py     # Generatore icona
-│   ├── make_startbat.py # Generatore script avvio
-│   ├── make_shortcut.py # Generatore shortcut Windows
-│   └── LEGGIMI.txt      # Guida utente finale
-├── build.rs             # Incorpora icona nell'exe (solo Windows)
+│   ├── icon.ico
+│   ├── icon.svg
+│   ├── make_icon.py
+│   ├── make_startbat.py
+│   ├── make_shortcut.py
+│   └── LEGGIMI.txt
+├── build.rs             # Incorpora icona nell'exe (Windows)
 ├── Cargo.toml
 ├── build_rust.bat       # Build script Windows
 └── build_rust.sh        # Build script macOS/Linux
@@ -143,16 +227,15 @@ gideon-ai/
 
 ---
 
-## Screenshot
-
-> *Aggiungi qui uno screenshot dell'interfaccia*
-
----
-
 ## Roadmap
 
+- [x] Routing intelligente multi-modello
+- [x] Streaming con bottone Stop
+- [x] Download codice generato
+- [x] Auto-Hardware Detection
+- [x] GGUF Picker con compatibilità hardware
+- [x] Connettore universale HuggingFace
 - [ ] Supporto GPU automatico (CUDA / Metal)
-- [ ] Scelta manuale del modello dall'interfaccia
 - [ ] Esportazione conversazione in PDF
 - [ ] Tema chiaro
 - [ ] Supporto Linux completo
