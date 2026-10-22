@@ -159,10 +159,19 @@ gideon-ai/
 
 ---
 
-## Licenza
+## 📄 Licenza
 
-MIT — libero di usare, modificare e distribuire.
+Copyright (c) 2026 Rocco Degiacomo
 
+Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
+
+Con la presente si concede il permesso di utilizzare, copiare, modificare e distribuire questo software e la relativa documentazione esclusivamente per scopi personali, didattici, di ricerca o comunque NON commerciali.
+
+Iscrizione del Copyright e dicitura di attribuzione originale devono essere incluse in tutte le copie o parti sostanziali del Software.
+
+È SEVERAMENTE VIETATO qualsiasi utilizzo commerciale, rivendita, inclusione in prodotti a pagamento o utilizzo a scopo di lucro senza la previa autorizzazione scritta di Rocco Degiacomo.
+
+IL SOFTWARE VIENE FORNITO "COSÌ COM'È", SENZA GARANZIA DI ALCUN TIPO.
 ---
 
 ## Autore
