@@ -1,0 +1,37 @@
+Ecco la versione aggiornata con l'evidenza dedicata al **riconoscimento automatico dell'hardware** previsto nella prossima release:
+
+---
+
+# 🚀 Gideon-AI: Universal AI Connector & Local/Cloud GUI
+
+## 📌 Visione del Progetto
+
+**Gideon-AI** nasce per abbattere le barriere d'uso dell'Intelligenza Artificiale, offrendo un'interfaccia web leggera, nativa (scritta in Rust con Axum) e altamente scalabile. L'obiettivo è creare un **connettore universale** capace di interfacciarsi con qualsiasi modello — attingendo dall'ecosistema di **Hugging Face** e dai motori locali — adattandosi dinamicamente alla potenza del computer su cui viene eseguito.
+
+* **Adattamento Dinamico:** Sfrutta al massimo l'hardware locale a disposizione (testato e perfettamente funzionante su un Lenovo T470s con Core i5 e 20GB di RAM), scalando verso i modelli remoti su Hugging Face quando la macchina locale necessita di ulteriore potenza di calcolo.
+* **Zero Vincoli:** Una vera IA a portata di mano, senza abbonamenti blindati e senza limiti d'uso.
+
+---
+
+## 🚧 Roadmap & Prossimi Sviluppi
+
+### 📦 Versione Attuale (Disponibile ora nel repository)
+
+La struttura fondamentale con backend nativo in Rust (Axum) e il motore di base funzionante. Potete già clonarla, testarla ed eseguirla sui vostri PC!
+
+### 🔮 In arrivo nella PROSSIMA VERSIONE (Work in Progress)
+
+Sto già lavorando attivamente alla nuova release che introdurrà miglioramenti sostanziali:
+
+1. 💻 **Riconoscimento Automatico dell'Hardware (Auto-Hardware Detection):**
+Gideon analizzerà automaticamente CPU, RAM disponibile e scheda grafica all'avvio del sistema, selezionando o suggerendo in autonomia la configurazione ottimale del modello senza richiedere impostazioni manuali complesse.
+2. 🎨 **Grafica Mozzafiato:**
+Un'interfaccia utente (UI) totalmente rinnovata, fluida, moderna e curata nei minimi dettagli.
+3. 🔌 **Connettore Automatizzato Universale:**
+Un sistema plug-and-play cross-platform per collegare e gestire automaticamente qualsiasi sistema esterno o modello di Hugging Face in un clic.
+
+---
+
+## 🤝 Unisciti al Progetto!
+
+Se vi piace l'idea di un'IA in locale, scalabile, libera da abbonamenti e capace di adattarsi a qualsiasi PC, **accetto volentieri consigli, feedback e collaborazioni**. Prova la versione attuale su GitHub e invia le tue PR o issue per far crescere Gideon-AI!
