@@ -14,6 +14,7 @@ futures-util = "0.3"
 webbrowser = "1.0"
 chrono = "0.4"
 sysinfo = "0.32"
+rmcp = { version = "0.3", features = ["client", "transport-child-process"] } # AGGIUNGI QUESTA RIGA
 
 [build-dependencies]
 
