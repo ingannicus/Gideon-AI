@@ -18,7 +18,7 @@ pub async fn try_gridcraft_action(prompt: &str) -> Option<String> {
         ).ok()?
     ).await {
         Ok(c) => c,
-        Err(_) => return Some("âš ï¸ GridCraft non avviato.".to_string()),
+        Err(_) => return Some("⚠️ GridCraft non avviato.".to_string()),
     };
 
     let data = extract_list_from_prompt(prompt);
@@ -40,7 +40,7 @@ pub async fn try_gridcraft_action(prompt: &str) -> Option<String> {
     };
 
     if let Err(e) = client.call_tool(write_params).await {
-        return Some(format!("âŒ Errore scrittura: {}", e));
+        return Some(format!("❌ Errore scrittura: {}", e));
     }
 
     let save_params = rmcp::model::CallToolRequestParam {
@@ -49,8 +49,8 @@ pub async fn try_gridcraft_action(prompt: &str) -> Option<String> {
     };
 
     match client.call_tool(save_params).await {
-        Ok(_) => Some(format!("âœ… Foglio salvato come gideon_grid.xlsx con {} righe.", end_row)),
-        Err(e) => Some(format!("âŒ Errore salvataggio: {}", e)),
+        Ok(_) => Some(format!("✅ Foglio salvato come gideon_grid.xlsx con {} righe: {}", end_row, data.join(", "))),
+        Err(e) => Some(format!("❌ Errore salvataggio: {}", e)),
     }
 }
 

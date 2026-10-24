@@ -22,7 +22,9 @@ mod pdfcraft;
 // CONFIGURAZIONE MODELLI E COSTANTI
 // ============================================================
 const MODEL_GEMMA: &str = "gemma3:4b";
-const MODEL_NEXUS: &str = "qwen2.5-coder:3b";
+const MODEL_NEXUS: &str = "qwen2.5-coder:7b";
+#[allow(dead_code)]
+const MODEL_FAST: &str = "FableForge-AI/nexus-coder";
 const MODEL_UNCENSORED: &str = "dolphinlabs/llama3.2-3b-uncensored";
 const OLLAMA_URL: &str = "http://localhost:11434";
 const PORT: u16 = 5000;

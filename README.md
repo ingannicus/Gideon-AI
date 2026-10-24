@@ -127,9 +127,13 @@ cargo run --release
 Scaricati automaticamente al primo avvio da `start.bat` / `start.sh`:
 
 ```bash
-ollama pull gemma3:4b
-ollama pull qwen2.5-coder:3b
-ollama pull dolphinlabs/llama3.2-3b-uncensored
+
+| Modello | Comando | Ruolo |
+|---------|---------|-------|
+| **Gemma 3 (4B)** | `ollama pull gemma3:4b` | Generale / Sicurezza |
+| **Qwen 2.5 Coder (7B)** | `ollama pull qwen2.5-coder:7b` | Codice |
+| **Nexus Coder (1.5B)** | `ollama pull FableForge-AI/nexus-coder` | Completamento rapido |
+| **Dolphin Llama 3.2 (3B)** | `ollama pull dolphinlabs/llama3.2-3b-uncensored` | Uncensored |
 ```
 
 Puoi aggiungere **qualsiasi modello HuggingFace** direttamente dall'interfaccia — basta incollare l'ID del repo.

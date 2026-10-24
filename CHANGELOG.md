@@ -1,4 +1,18 @@
 # Changelog — Gideon AI
+## [4.1.0] — 2026-10-24
+
+### Modificato
+- **Modello per programmazione aggiornato**: `qwen2.5-coder:3b` → `qwen2.5-coder:7b`
+- **Aggiunto `MODEL_FAST`**: `FableForge-AI/nexus-coder` (1.54B, ~986 MB)
+
+### Corretto
+- **PdfCraft**: risolto errore `unknown argument "path"` — ora usa `doc_open` + `text_extract` con `doc` e `pages`
+- **PdfCraft**: output pulito (solo testo, senza JSON)
+- **GridCraft**: rimosso hardcoded "Mario, Luigi" — ora estrae i dati dal prompt
+
+### Note
+- Il modello `qwen2.5-coder:3b` non è più necessario: `ollama rm qwen2.5-coder:3b`
+- PdfCraft richiede `--root` per trovare i file nella cartella del progetto
 
 Tutte le modifiche rilevanti al progetto sono documentate in questo file.
 
