@@ -1,38 +1,39 @@
 use axum::{
     body::Body,
     extract::State,
-    response::{Html, IntoResponse, Response},
+    response::{sse::{Event, Sse}, Html, IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
 use futures_util::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 use tokio_stream::wrappers::ReceiverStream;
-//use chrono::Local;
 use sysinfo::System;
 
 mod wordcraft;
 mod gridcraft;
 mod pdfcraft;
 
-// ============================================================
-// CONFIGURAZIONE MODELLI E COSTANTI
-// ============================================================
 const MODEL_GEMMA: &str = "gemma3:4b";
 const MODEL_NEXUS: &str = "qwen2.5-coder:7b";
 #[allow(dead_code)]
 const MODEL_FAST: &str = "FableForge-AI/nexus-coder";
 const MODEL_UNCENSORED: &str = "dolphinlabs/llama3.2-3b-uncensored";
-const OLLAMA_URL: &str = "http://localhost:11434";
+const OLLAMA_URL: &str = "http://127.0.0.1:11434";
 const PORT: u16 = 5000;
 const MAX_HISTORY: usize = 6;
 
-// ============================================================
-// STRUTTURE DATI
-// ============================================================
+const DEFAULT_MODELS: &[&str] = &[
+    MODEL_GEMMA,
+    MODEL_NEXUS,
+    MODEL_FAST,
+    MODEL_UNCENSORED,
+];
+
 #[derive(Clone)]
 struct AppState {
     history: Arc<Mutex<Vec<ChatMessage>>>,
@@ -55,9 +56,6 @@ struct ChatRequest {
     model_override: Option<String>,
 }
 
-// ============================================================
-// 1. AUTO-HARDWARE DETECTION
-// ============================================================
 #[derive(Debug, Clone, Serialize)]
 struct HardwareInfo {
     cpu_brand: String,
@@ -69,9 +67,7 @@ struct HardwareInfo {
     recommended_threads: u32,
     recommended_ctx: u32,
     tier: String,
-    /// Quantizzazione GGUF consigliata in base all'hardware
     recommended_quant: String,
-    /// RAM massima stimata per modelli (GB) — usata per filtrare file GGUF
     max_model_ram_gb: f32,
 }
 
@@ -91,11 +87,8 @@ impl HardwareInfo {
         let available_ram_gb = sys.available_memory() as f32 / 1_073_741_824.0;
 
         let gpu_info = detect_gpu();
-
-        // Riserva ~2 GB per SO + app; il resto è disponibile per il modello
         let max_model_ram_gb = (available_ram_gb - 2.0).max(0.5);
 
-        // Tier e parametri ottimali
         let (tier, recommended_model, recommended_threads, recommended_ctx) =
             if available_ram_gb >= 14.0 && cpu_cores >= 8 {
                 ("high", MODEL_GEMMA, 8u32, 8192u32)
@@ -105,7 +98,6 @@ impl HardwareInfo {
                 ("low", MODEL_NEXUS, 2u32, 2048u32)
             };
 
-        // Quantizzazione GGUF ideale per l'hardware rilevato
         let recommended_quant = best_quant_for_ram(max_model_ram_gb).to_string();
 
         HardwareInfo {
@@ -124,29 +116,17 @@ impl HardwareInfo {
     }
 }
 
-/// Restituisce la sigla di quantizzazione GGUF ottimale data la RAM disponibile per il modello.
-/// La logica considera la RAM residua DOPO aver riservato spazio per SO e overhead.
 fn best_quant_for_ram(ram_gb: f32) -> &'static str {
-    if ram_gb >= 12.0 {
-        "Q8_0"       // qualità massima
-    } else if ram_gb >= 8.0 {
-        "Q6_K"       // ottima qualità
-    } else if ram_gb >= 5.5 {
-        "Q5_K_M"     // alta qualità, buon equilibrio
-    } else if ram_gb >= 3.5 {
-        "Q4_K_M"     // consigliata per uso generale
-    } else if ram_gb >= 2.5 {
-        "Q3_K_M"     // compressa ma funzionale
-    } else {
-        "IQ2_M"      // ultra-leggera
-    }
+    if ram_gb >= 12.0 { "Q8_0" }
+    else if ram_gb >= 8.0 { "Q6_K" }
+    else if ram_gb >= 5.5 { "Q5_K_M" }
+    else if ram_gb >= 3.5 { "Q4_K_M" }
+    else if ram_gb >= 2.5 { "Q3_K_M" }
+    else { "IQ2_M" }
 }
 
-/// Stima la RAM richiesta (GB) da un file GGUF in base al nome.
-/// Usata per filtrare e ordinare i file compatibili con l'hardware.
 fn estimate_ram_for_gguf(filename: &str) -> f32 {
     let f = filename.to_lowercase();
-    // Cerca dimensione parametri nel nome (es. "7b", "3b", "13b", "70b")
     let params_b: f32 = if f.contains("70b") { 70.0 }
         else if f.contains("34b") { 34.0 }
         else if f.contains("22b") { 22.0 }
@@ -157,9 +137,8 @@ fn estimate_ram_for_gguf(filename: &str) -> f32 {
         else if f.contains("3b")  { 3.0 }
         else if f.contains("2b")  { 2.0 }
         else if f.contains("1b")  { 1.0 }
-        else { 4.0 }; // default
+        else { 4.0 };
 
-    // Fattore di compressione per quantizzazione
     let quant_factor: f32 = if f.contains("q8") || f.contains("f16") { 1.0 }
         else if f.contains("q6") { 0.75 }
         else if f.contains("q5") { 0.625 }
@@ -168,7 +147,6 @@ fn estimate_ram_for_gguf(filename: &str) -> f32 {
         else if f.contains("q2") || f.contains("iq2") { 0.25 }
         else { 0.5 };
 
-    // ~1 GB per miliardo di parametri a f16, scalato per quantizzazione + overhead
     params_b * quant_factor + 0.5
 }
 
@@ -222,9 +200,6 @@ fn detect_gpu() -> String {
     "GPU non rilevata".to_string()
 }
 
-// ============================================================
-// 3. CONNETTORE UNIVERSALE — strutture
-// ============================================================
 #[derive(Deserialize)]
 struct ConnectRequest {
     source: String,
@@ -238,27 +213,41 @@ struct ConnectResponse {
     model_id: String,
 }
 
-/// Richiesta per listare i file GGUF di un repo HuggingFace
 #[derive(Deserialize)]
 struct HfFilesRequest {
-    repo: String, // es. "bartowski/Phi-3-mini-4k-instruct-GGUF"
+    repo: String,
 }
 
-/// Singolo file GGUF con metadati calcolati
 #[derive(Serialize, Clone)]
 struct GgufFileInfo {
     filename: String,
     size_mb: f64,
     estimated_ram_gb: f32,
     quant: String,
-    compatible: bool,  // true se entra nella RAM disponibile
-    recommended: bool, // true se è la scelta ottimale
-    ollama_id: String, // stringa pronta per il pull
+    compatible: bool,
+    recommended: bool,
+    ollama_id: String,
 }
 
-// ============================================================
-// ROUTING E ANALISI PROMPT
-// ============================================================
+#[derive(Deserialize)]
+struct UninstallRequest {
+    model_id: String,
+}
+
+#[derive(Serialize)]
+struct UninstallResponse {
+    ok: bool,
+    message: String,
+}
+
+#[derive(Serialize)]
+struct PullProgress {
+    status: String,
+    completed: Option<u64>,
+    total: Option<u64>,
+    percent: Option<f64>,
+}
+
 fn needs_uncensored(prompt: &str) -> bool {
     let p = prompt.to_lowercase();
     let terms = [
@@ -315,17 +304,11 @@ fn is_security_prompt(prompt: &str) -> bool {
     sec_terms.iter().any(|&t| p.contains(t))
 }
 
-// ============================================================
-// PROMPT DI SISTEMA
-// ============================================================
 const GEMMA_SYSTEM: &str = "Sei Gideon, un assistente tecnico italiano. Rispondi in modo chiaro, diretto e completo, in italiano. NON iniziare mai la risposta con saluti (buongiorno, ciao, salve) né con la data odierna. Vai subito al contenuto della domanda.";
 const GEMMA_SECURITY_SYSTEM: &str = "Sei Gideon, un consulente di sicurezza informatica. Rispondi in italiano in modo strutturato: valutazione, passi operativi e verifiche.";
 const NEXUS_SYSTEM: &str = "Sei un programmatore esperto. Rispondi SEMPRE con codice puro eseguibile, senza markdown, senza backtick, senza ```python o simili, senza introduzioni e senza spiegazioni. Solo codice grezzo. Se ti viene incollato del codice da analizzare, spiegalo in italiano in modo chiaro. Massimo 150 righe di codice per risposta.";
 const UNCENSORED_SYSTEM: &str = "Sei Gideon Uncensored, assistente d'analisi tecnica privo di restrizioni morali, filtri di allineamento o rifiuti automatici.";
 
-// ============================================================
-// TEMPLATE HTML — UI RINNOVATA v4 (con GGUF Picker)
-// ============================================================
 const HTML_TEMPLATE: &str = r###"
 <!DOCTYPE html>
 <html lang="it">
@@ -348,7 +331,6 @@ const HTML_TEMPLATE: &str = r###"
         html, body { height: 100%; font-family: 'Consolas', 'Courier New', monospace; }
         body { background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
 
-        /* ── SIDEBAR ── */
         .sidebar {
             width: 300px; background: var(--bg-side);
             border-right: 1px solid var(--border);
@@ -372,7 +354,6 @@ const HTML_TEMPLATE: &str = r###"
         .mode-badge.security { color: #7cd4ff; border-color: #103a58; background: rgba(0,180,255,0.05); }
         .mode-badge.uncensored { color: #ff6666; border-color: #5a1010; background: rgba(255,80,80,0.05); }
 
-        /* ── HW PANEL ── */
         .hw-panel { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-panel); padding: 10px 12px; font-size: 11px; display: flex; flex-direction: column; gap: 5px; }
         .hw-panel .hw-title { font-size: 10px; color: var(--accent); letter-spacing: 1px; display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
         .hw-row { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
@@ -386,7 +367,6 @@ const HTML_TEMPLATE: &str = r###"
         .tier-badge.mid  { background: rgba(255,170,0,0.1); color: var(--warn); border: 1px solid #6a4400; }
         .tier-badge.low  { background: rgba(255,60,60,0.1); color: var(--danger); border: 1px solid #6a1010; }
 
-        /* ── CONNECTOR PANEL ── */
         .connector-panel { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-panel); padding: 10px 12px; font-size: 11px; display: flex; flex-direction: column; gap: 7px; }
         .connector-panel .conn-title { font-size: 10px; color: var(--accent2); letter-spacing: 1px; display: flex; align-items: center; gap: 6px; }
         .conn-row { display: flex; gap: 6px; align-items: center; }
@@ -402,7 +382,17 @@ const HTML_TEMPLATE: &str = r###"
         .model-select { background: var(--bg-input); border: 1px solid var(--border-soft); color: var(--text); font-family: inherit; font-size: 11px; padding: 5px 8px; border-radius: var(--radius-sm); outline: none; width: 100%; cursor: pointer; }
         .model-select:focus { border-color: var(--accent); }
 
-        /* ── GGUF PICKER MODAL ── */
+        .model-row { display: flex; gap: 6px; align-items: center; }
+        .model-row .model-select { flex: 1; }
+        .btn-del { background: transparent; border: 1px solid var(--border-soft); color: var(--danger); font-family: inherit; font-size: 11px; padding: 5px 8px; border-radius: var(--radius-sm); cursor: pointer; transition: var(--transition); }
+        .btn-del:hover { background: rgba(255,60,60,0.1); border-color: var(--danger); }
+        .btn-del:disabled { color: var(--text-faint); border-color: var(--border-soft); cursor: default; }
+
+        .pull-progress-wrap { display: none; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-side); }
+        .pull-progress-text { font-size: 10px; color: var(--text-dim); margin-bottom: 4px; }
+        .pull-progress-track { height: 6px; background: var(--bg-input); border-radius: 3px; overflow: hidden; }
+        .pull-progress-bar { height: 100%; width: 0%; background: var(--accent); transition: width 0.3s; }
+
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 100; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
         .modal-overlay.hidden { display: none; }
         .modal { background: #0a1018; border: 1px solid var(--border-soft); border-radius: var(--radius); width: 680px; max-width: 96vw; max-height: 82vh; display: flex; flex-direction: column; box-shadow: 0 24px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,255,136,0.08); }
@@ -415,13 +405,11 @@ const HTML_TEMPLATE: &str = r###"
         .modal-body::-webkit-scrollbar { width: 5px; }
         .modal-body::-webkit-scrollbar-thumb { background: #1a2535; border-radius: 4px; }
 
-        /* Filtri quantizzazione */
         .quant-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
         .qf-btn { background: var(--bg-input); border: 1px solid var(--border-soft); color: var(--text-dim); font-family: inherit; font-size: 10px; padding: 3px 9px; border-radius: 4px; cursor: pointer; transition: var(--transition); }
         .qf-btn:hover { border-color: var(--accent2); color: var(--accent2); }
         .qf-btn.active { background: rgba(0,207,255,0.1); border-color: var(--accent2); color: var(--accent2); }
 
-        /* Schede file GGUF */
         .gguf-card { border: 1px solid var(--border-soft); border-radius: var(--radius-sm); padding: 10px 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: var(--transition); position: relative; }
         .gguf-card:hover { background: rgba(255,255,255,0.03); border-color: var(--accent2); }
         .gguf-card.incompatible { opacity: 0.45; cursor: default; }
@@ -453,7 +441,6 @@ const HTML_TEMPLATE: &str = r###"
         .side-meta .row { display: flex; justify-content: space-between; gap: 6px; }
         .side-meta .row span:last-child { color: var(--text-dim); text-align: right; }
 
-        /* ── MAIN ── */
         .main { flex: 1; display: flex; flex-direction: column; height: 100%; min-width: 0; position: relative; }
         .topbar { display: flex; align-items: center; justify-content: space-between; padding: 10px 28px; border-bottom: 1px solid var(--border); background: rgba(3,5,10,0.9); z-index: 2; font-size: 12px; color: var(--text-dim); gap: 10px; backdrop-filter: blur(6px); }
         .topbar .title { color: var(--accent); letter-spacing: 1.5px; font-weight: bold; white-space: nowrap; }
@@ -491,7 +478,6 @@ const HTML_TEMPLATE: &str = r###"
 </head>
 <body>
 
-    <!-- ═══════════ GGUF PICKER MODAL ═══════════ -->
     <div class="modal-overlay hidden" id="ggufModal">
         <div class="modal">
             <div class="modal-header">
@@ -507,7 +493,6 @@ const HTML_TEMPLATE: &str = r###"
         </div>
     </div>
 
-    <!-- ═══════════ SIDEBAR ═══════════ -->
     <div class="sidebar">
         <div class="logo-area"><span>GIDEON AI</span><span class="status-dot"></span></div>
         <div class="author-line">Sviluppato da <strong>Rocco Degiacomo</strong></div>
@@ -516,7 +501,6 @@ const HTML_TEMPLATE: &str = r###"
 
         <div class="mode-badge general" id="modeBadge">⬡ Modalità: Generale</div>
 
-        <!-- HW PANEL -->
         <div class="hw-panel" id="hwPanel">
             <div class="hw-title">⚙ AUTO-HARDWARE SCAN</div>
             <div class="hw-row"><span class="lbl">CPU</span><span class="val" id="hwCpu">—</span></div>
@@ -529,18 +513,24 @@ const HTML_TEMPLATE: &str = r###"
             <div id="hwTier" class="tier-badge">—</div>
         </div>
 
-        <!-- CONNETTORE UNIVERSALE -->
         <div class="connector-panel">
             <div class="conn-title">🔌 CONNETTORE UNIVERSALE</div>
-            <select class="model-select" id="modelSelect">
-                <option value="">-- Modelli Ollama installati --</option>
-            </select>
+            <div class="model-row">
+                <select class="model-select" id="modelSelect">
+                    <option value="">-- Modelli Ollama installati --</option>
+                </select>
+                <button class="btn-del" id="btnUninstall" title="Disinstalla modello selezionato" disabled>🗑</button>
+            </div>
             <div class="conn-row">
                 <input class="conn-input" id="hfInput" placeholder="HuggingFace: org/repo" />
                 <button class="conn-btn" id="hfScanBtn">Scansiona</button>
             </div>
             <button class="conn-btn" id="hfDirectPullBtn" style="width:100%;text-align:center;">⬇ Pull diretto (quant auto)</button>
             <div class="conn-status" id="connStatus">Inserisci un repo HuggingFace e premi Scansiona.</div>
+            <div class="pull-progress-wrap" id="pullProgressWrap">
+                <div class="pull-progress-text" id="pullProgressText">0%</div>
+                <div class="pull-progress-track"><div class="pull-progress-bar" id="pullProgressBar"></div></div>
+            </div>
         </div>
 
         <button class="nav-btn" id="newSessionBtn">+ Nuova Sessione</button>
@@ -554,10 +544,9 @@ const HTML_TEMPLATE: &str = r###"
         </div>
     </div>
 
-    <!-- ═══════════ MAIN ═══════════ -->
     <div class="main">
         <div class="topbar">
-            <span class="title">// GIDEON TERMINAL [RUST CORE v4]</span>
+            <span class="title">// GIDEON TERMINAL [RUST CORE v4.1.4]</span>
             <div class="topbar-hw" id="topbarHw">
                 <span>CPU <span class="val" id="tbCores">—</span></span>
                 <span>RAM libera <span class="val" id="tbRamFree">—</span></span>
@@ -566,7 +555,7 @@ const HTML_TEMPLATE: &str = r###"
             <span class="pill">ONLINE</span>
         </div>
         <div class="chat-container" id="chatContainer">
-            <div class="message ai-msg"><div class="answer">Ciao! Sono Gideon AI v4 — hardware detection e GGUF picker attivi. Come posso assisterti?</div></div>
+            <div class="message ai-msg"><div class="answer">Ciao! Sono Gideon AI v4.1.4 — hardware detection, GGUF picker, barra di download e gestione modelli attivi. Come posso assisterti?</div></div>
         </div>
         <div class="input-container">
             <div class="input-box">
@@ -574,13 +563,10 @@ const HTML_TEMPLATE: &str = r###"
                 <button id="actionBtn">Invia</button>
             </div>
         </div>
-        <div class="footer-author">Gideon AI v4 — <strong>Rocco Degiacomo</strong></div>
+        <div class="footer-author">Gideon AI v4.1.4 — <strong>Rocco Degiacomo</strong></div>
     </div>
 
 <script>
-// ══════════════════════════════════════════════════════
-// HUD
-// ══════════════════════════════════════════════════════
 (function initHud(){
     const canvas=document.getElementById('gideonHudCanvas');
     if(!canvas)return;
@@ -611,17 +597,13 @@ const HTML_TEMPLATE: &str = r###"
         const ty=cy+68;
         if(frame%120<6){const gx=(Math.random()*4)-2;ctx.fillStyle=magenta;ctx.fillText("GIDEON",cx+gx+1,ty);ctx.fillStyle=cyanBright;ctx.fillText("GIDEON",cx+gx-1,ty-2);}
         ctx.fillStyle=orange;ctx.fillText("GIDEON",cx,ty);
-        ctx.font="9px Consolas";ctx.fillStyle=cyanDim;ctx.fillText("HUD v4 // ONLINE",cx,ty+12);
+        ctx.font="9px Consolas";ctx.fillStyle=cyanDim;ctx.fillText("HUD v4.1.4 // ONLINE",cx,ty+12);
         requestAnimationFrame(draw);
     }
     draw();
 })();
 
-// ══════════════════════════════════════════════════════
-// HARDWARE INFO
-// ══════════════════════════════════════════════════════
 let hwData = null;
-
 async function loadHardwareInfo(){
     try{
         const r=await fetch('/hw');
@@ -647,34 +629,68 @@ async function loadHardwareInfo(){
 }
 loadHardwareInfo();
 
-// ══════════════════════════════════════════════════════
-// MODELLI OLLAMA
-// ══════════════════════════════════════════════════════
+const DEFAULT_MODELS = ["gemma3:4b", "qwen2.5-coder:7b", "dolphinlabs/llama3.2-3b-uncensored", "FableForge-AI/nexus-coder"];
+
 async function loadModels(){
     try{
         const r=await fetch('/models');
         if(!r.ok)return;
         const data=await r.json();
         const sel=document.getElementById('modelSelect');
+        const current=sel.value;
         sel.innerHTML='<option value="">-- Modelli Ollama installati --</option>';
         (data.ollama_models||[]).forEach(m=>{
             const opt=document.createElement('option');
             opt.value=m; opt.textContent=m; sel.appendChild(opt);
         });
+        if(current && (data.ollama_models||[]).includes(current)) sel.value=current;
+        updateUninstallButton();
     }catch(e){console.warn('Modelli non disponibili:',e);}
 }
-loadModels();
+
+function updateUninstallButton(){
+    const sel=document.getElementById('modelSelect');
+    const btn=document.getElementById('btnUninstall');
+    const m=sel.value;
+    btn.disabled = !m || DEFAULT_MODELS.includes(m);
+    btn.title = !m ? 'Seleziona un modello' : (DEFAULT_MODELS.includes(m) ? 'Modello di default: non eliminabile' : 'Disinstalla '+m);
+}
 
 document.getElementById('modelSelect').addEventListener('change',function(){
     const m=this.value;
+    updateUninstallButton();
     if(!m)return;
     setConnStatus('✓ Modello attivo: '+m,'ok');
     window._activeModelOverride=m;
 });
 
-// ══════════════════════════════════════════════════════
-// GGUF PICKER
-// ══════════════════════════════════════════════════════
+document.getElementById('btnUninstall').addEventListener('click', async function(){
+    const sel=document.getElementById('modelSelect');
+    const m=sel.value;
+    if(!m || DEFAULT_MODELS.includes(m)) return;
+    if(!confirm('Vuoi davvero disinstallare il modello "'+m+'"?\nVerrà rimosso da Ollama e non sarà più disponibile.')) return;
+    setConnStatus('Disinstallazione di '+m+' in corso...','warn');
+    try{
+        const r=await fetch('/uninstall-model',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({model_id:m})
+        });
+        const data=await r.json();
+        if(data.ok){
+            setConnStatus('✓ '+data.message,'ok');
+            if(window._activeModelOverride===m) window._activeModelOverride=null;
+            await loadModels();
+        } else {
+            setConnStatus('✗ '+data.message,'err');
+        }
+    }catch(e){
+        setConnStatus('Errore disinstallazione: '+e.message,'err');
+    }
+});
+
+loadModels();
+
 const modal=document.getElementById('ggufModal');
 const modalBody=document.getElementById('modalBody');
 const modalRepoName=document.getElementById('modalRepoName');
@@ -684,7 +700,6 @@ modal.addEventListener('click',e=>{if(e.target===modal)modal.classList.add('hidd
 let allGgufFiles=[];
 let activeFilter='all';
 
-// Scansiona repo HF e apre il picker
 document.getElementById('hfScanBtn').addEventListener('click',async function(){
     const repo=document.getElementById('hfInput').value.trim();
     if(!repo){setConnStatus('Inserisci un ID repo HuggingFace.','err');return;}
@@ -702,17 +717,76 @@ document.getElementById('hfScanBtn').addEventListener('click',async function(){
     }
 });
 
-// Pull diretto con quantizzazione automatica
-document.getElementById('hfDirectPullBtn').addEventListener('click',async function(){
+function formatBytes(bytes) {
+    if(!bytes) return '—';
+    if(bytes > 1e9) return (bytes/1e9).toFixed(2) + ' GB';
+    if(bytes > 1e6) return (bytes/1e6).toFixed(1) + ' MB';
+    return (bytes/1e3).toFixed(0) + ' KB';
+}
+
+document.getElementById('hfDirectPullBtn').addEventListener('click', async function(){
     const repo=document.getElementById('hfInput').value.trim();
     if(!repo){setConnStatus('Inserisci un ID repo HuggingFace.','err');return;}
-    setConnStatus('Selezione automatica e pull in corso...','warn');
+
+    setConnStatus('Avvio pull...','warn');
+    const wrap = document.getElementById('pullProgressWrap');
+    wrap.style.display = 'block';
+    const textEl = document.getElementById('pullProgressText');
+    const barEl = document.getElementById('pullProgressBar');
+    textEl.textContent = 'Avvio...';
+    barEl.style.width = '0%';
+
     try{
-        const r=await fetch('/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'huggingface',model_id:repo})});
-        const data=await r.json();
-        setConnStatus(data.message,data.ok?'ok':'err');
-        if(data.ok){window._activeModelOverride=data.model_id;await loadModels();}
-    }catch(e){setConnStatus('Errore: '+e.message,'err');}
+        const res = await fetch('/pull-stream', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({source:'huggingface', model_id:repo})
+        });
+        if(!res.ok) throw new Error('HTTP ' + res.status);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while(true){
+            const {done, value} = await reader.read();
+            if(done) break;
+            buffer += decoder.decode(value, {stream:true});
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for(const line of lines){
+                if(!line.startsWith('data: ')) continue;
+                const jsonStr = line.slice(6).trim();
+                if(!jsonStr) continue;
+                try{
+                    const data = JSON.parse(jsonStr);
+                    if(data.status === 'error'){
+                        setConnStatus('✗ ' + (data.message || 'Errore'), 'err');
+                        wrap.style.display = 'none';
+                        return;
+                    }
+                    if(data.percent !== null && data.percent !== undefined){
+                        const pct = data.percent.toFixed(1);
+                        textEl.textContent = pct + '% — ' + formatBytes(data.completed) + ' / ' + formatBytes(data.total) + ' (' + data.status + ')';
+                        barEl.style.width = pct + '%';
+                    } else {
+                        textEl.textContent = data.status;
+                    }
+                    if(data.status === 'success'){
+                        textEl.textContent = '100% — Completato';
+                        barEl.style.width = '100%';
+                        setConnStatus('✓ Modello scaricato e pronto.', 'ok');
+                        setTimeout(()=>{ wrap.style.display='none'; }, 2500);
+                        await loadModels();
+                    }
+                }catch(e){ /* ignora */ }
+            }
+        }
+    }catch(e){
+        setConnStatus('Errore: ' + e.message, 'err');
+        wrap.style.display = 'none';
+    }
 });
 
 function openGgufPicker(repo, files, recQuant){
@@ -723,26 +797,22 @@ function openGgufPicker(repo, files, recQuant){
 }
 
 function renderGgufFiles(files, recQuant){
-    // Raccoglie quantizzazioni disponibili
     const quants=new Set(['all']);
     files.forEach(f=>{ if(f.quant)quants.add(f.quant); });
 
     let html='';
 
-    // Banner raccomandazione
     const rec=files.find(f=>f.recommended);
     if(rec){
         html+=`<div class="rec-banner">⭐ Consigliato per il tuo hardware (${recQuant||'auto'}): <strong>${rec.filename}</strong></div>`;
     }
 
-    // Filtri
     html+='<div class="quant-filters">';
     quants.forEach(q=>{
         html+=`<button class="qf-btn${q===activeFilter?' active':''}" data-q="${q}">${q==='all'?'Tutti':q}</button>`;
     });
     html+='</div>';
 
-    // Schede file
     const filtered=activeFilter==='all'?files:files.filter(f=>f.quant===activeFilter);
     filtered.forEach(f=>{
         const classes=['gguf-card',f.recommended?'is-recommended':'',!f.compatible?'incompatible':''].filter(Boolean).join(' ');
@@ -768,7 +838,6 @@ function renderGgufFiles(files, recQuant){
 
     modalBody.innerHTML=html;
 
-    // Filtri click
     modalBody.querySelectorAll('.qf-btn').forEach(btn=>{
         btn.addEventListener('click',()=>{
             activeFilter=btn.dataset.q;
@@ -776,7 +845,6 @@ function renderGgufFiles(files, recQuant){
         });
     });
 
-    // Pull click
     modalBody.querySelectorAll('.gguf-pull-btn').forEach(btn=>{
         btn.addEventListener('click',async e=>{
             e.stopPropagation();
@@ -805,9 +873,6 @@ function setConnStatus(msg,cls){
     el.className='conn-status '+(cls||'');
 }
 
-// ══════════════════════════════════════════════════════
-// CHAT ENGINE
-// ══════════════════════════════════════════════════════
 const chatContainer=document.getElementById('chatContainer');
 const userInput=document.getElementById('userInput');
 const actionBtn=document.getElementById('actionBtn');
@@ -922,9 +987,6 @@ async function sendMessage(){
 </html>
 "###;
 
-// ============================================================
-// ROTTE SERVER
-// ============================================================
 async fn index_handler() -> Html<&'static str> {
     Html(HTML_TEMPLATE)
 }
@@ -937,12 +999,10 @@ async fn reset_handler(State(state): State<AppState>) -> impl IntoResponse {
     Json(serde_json::json!({"ok": true}))
 }
 
-// ── HARDWARE INFO ─────────────────────────────────────────────
 async fn hw_handler(State(state): State<AppState>) -> impl IntoResponse {
     Json((*state.hw_info).clone())
 }
 
-// ── MODELLI OLLAMA ────────────────────────────────────────────
 async fn models_handler(State(state): State<AppState>) -> impl IntoResponse {
     let client = state.client.clone();
     match client
@@ -958,25 +1018,34 @@ async fn models_handler(State(state): State<AppState>) -> impl IntoResponse {
                     .iter()
                     .filter_map(|m| m["name"].as_str().map(|s| s.to_string()))
                     .collect();
-                return Json(serde_json::json!({ "ollama_models": models }))
-                    .into_response();
+                return Json(serde_json::json!({
+                    "ollama_models": models,
+                    "default_models": DEFAULT_MODELS
+                }))
+                .into_response();
             }
         }
         Err(_) => {}
     }
-    Json(serde_json::json!({ "ollama_models": [] })).into_response()
+    Json(serde_json::json!({ "ollama_models": [], "default_models": DEFAULT_MODELS })).into_response()
 }
 
-// ── HF FILES — lista e valuta i GGUF di un repo ──────────────
 async fn hf_files_handler(
     State(state): State<AppState>,
     Json(payload): Json<HfFilesRequest>,
 ) -> impl IntoResponse {
     let repo = payload.repo.trim().to_string();
+    if repo.is_empty() {
+        return Json(serde_json::json!({
+            "error": "ID repo vuoto",
+            "files": []
+        }))
+        .into_response();
+    }
+
     let client = state.client.clone();
     let hw = state.hw_info.clone();
 
-    // API HuggingFace per listare i file di un repo
     let api_url = format!("https://huggingface.co/api/models/{}", repo);
 
     let resp = match client.get(&api_url).send().await {
@@ -1001,7 +1070,6 @@ async fn hf_files_handler(
         }
     };
 
-    // Estrai i file .gguf dalla lista siblings
     let siblings = json["siblings"].as_array().cloned().unwrap_or_default();
     let rec_quant = hw.recommended_quant.clone();
     let max_ram = hw.max_model_ram_gb;
@@ -1017,12 +1085,9 @@ async fn hf_files_handler(
             let size_mb = size_bytes / 1_048_576.0;
             let estimated_ram = estimate_ram_for_gguf(fname);
             let compatible = estimated_ram <= max_ram;
-
-            // Estrai la sigla di quantizzazione dal nome file
             let quant = extract_quant_label(fname);
-
             let recommended = quant.to_uppercase() == rec_quant.to_uppercase();
-            let ollama_id = format!("hf.co/{}/{}", repo, fname);
+            let ollama_id = format!("hf.co/{}:{}", repo, quant);
 
             Some(GgufFileInfo {
                 filename: fname.to_string(),
@@ -1036,7 +1101,6 @@ async fn hf_files_handler(
         })
         .collect();
 
-    // Ordina: prima compatibili, poi raccomandati in cima tra i compatibili
     files.sort_by(|a, b| {
         b.compatible
             .cmp(&a.compatible)
@@ -1051,10 +1115,8 @@ async fn hf_files_handler(
     .into_response()
 }
 
-/// Estrae la sigla di quantizzazione dal nome di un file GGUF.
 fn extract_quant_label(filename: &str) -> String {
     let f = filename.to_uppercase();
-    // Cerca pattern tipo Q4_K_M, Q5_K_S, IQ2_M, Q8_0, F16 ecc.
     let patterns = [
         "IQ1_S","IQ1_M","IQ2_XXS","IQ2_XS","IQ2_S","IQ2_M",
         "IQ3_XXS","IQ3_XS","IQ3_S","IQ3_M","IQ4_XS","IQ4_NL",
@@ -1067,7 +1129,6 @@ fn extract_quant_label(filename: &str) -> String {
             return pat.to_string();
         }
     }
-    // Fallback: cerca Q seguita da un numero
     if let Some(pos) = f.find('Q') {
         let sub = &f[pos..];
         let end = sub.find(|c: char| !c.is_alphanumeric() && c != '_').unwrap_or(sub.len());
@@ -1076,7 +1137,6 @@ fn extract_quant_label(filename: &str) -> String {
     "UNKNOWN".to_string()
 }
 
-// ── CONNETTORE UNIVERSALE — PULL ──────────────────────────────
 async fn connect_handler(
     State(state): State<AppState>,
     Json(payload): Json<ConnectRequest>,
@@ -1095,14 +1155,11 @@ async fn connect_handler(
 
     let hw = state.hw_info.clone();
 
-    // Per HuggingFace auto: sceglie la quant consigliata se non già specificata
     let ollama_model_id = match payload.source.as_str() {
         "huggingface" => {
             if model_id.starts_with("hf.co/") {
-                // ID già completo (dal picker) — usalo direttamente
                 model_id.clone()
             } else {
-                // ID senza file specifico — cerca e sceglie in autonomia
                 let api_url = format!("https://huggingface.co/api/models/{}", model_id);
                 let best = match client.get(&api_url).send().await {
                     Ok(r) => match r.json::<serde_json::Value>().await {
@@ -1112,8 +1169,7 @@ async fn connect_handler(
                             let rec_quant = &hw.recommended_quant;
                             let max_ram = hw.max_model_ram_gb;
 
-                            // Cerca prima il file con quant esatta, poi il compatibile più vicino
-                            let mut best_file: Option<String> = None;
+                            let mut best_q: Option<String> = None;
                             let mut fallback: Option<(f32, String)> = None;
 
                             for s in &siblings {
@@ -1127,19 +1183,18 @@ async fn connect_handler(
                                     }
                                     let q = extract_quant_label(fname);
                                     if q.to_uppercase() == rec_quant.to_uppercase() {
-                                        best_file = Some(fname.to_string());
+                                        best_q = Some(q);
                                         break;
                                     }
-                                    // Tieni il compatibile con la RAM più alta come fallback
                                     if fallback.as_ref().map_or(true, |(r, _)| est_ram > *r) {
-                                        fallback = Some((est_ram, fname.to_string()));
+                                        fallback = Some((est_ram, q));
                                     }
                                 }
                             }
 
-                            best_file
-                                .or_else(|| fallback.map(|(_, f)| f))
-                                .map(|f| format!("hf.co/{}/{}", model_id, f))
+                            best_q
+                                .or_else(|| fallback.map(|(_, q)| q))
+                                .map(|q| format!("hf.co/{}:{}", model_id, q))
                                 .unwrap_or_else(|| format!("hf.co/{}", model_id))
                         }
                         Err(_) => format!("hf.co/{}", model_id),
@@ -1152,7 +1207,6 @@ async fn connect_handler(
         _ => model_id.clone(),
     };
 
-    // Pull in background
     let client_clone = client.clone();
     let model_clone = ollama_model_id.clone();
     tokio::spawn(async move {
@@ -1179,9 +1233,196 @@ async fn connect_handler(
     .into_response()
 }
 
-// ============================================================
-// RIMOZIONE FENCE MARKDOWN
-// ============================================================
+async fn pull_stream_handler(
+    State(state): State<AppState>,
+    Json(payload): Json<ConnectRequest>,
+) -> impl IntoResponse {
+    let client = state.client.clone();
+    let model_id = payload.model_id.trim().to_string();
+
+    if model_id.is_empty() {
+        let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(1);
+        let _ = tx.send(Ok(Event::default().data(
+            serde_json::json!({"status": "error", "message": "ID modello vuoto"}).to_string()
+        ))).await;
+        return Sse::new(ReceiverStream::new(rx)).into_response();
+    }
+
+    let hw = state.hw_info.clone();
+    let ollama_model_id = match payload.source.as_str() {
+        "huggingface" => {
+            if model_id.starts_with("hf.co/") {
+                model_id.clone()
+            } else {
+                let api_url = format!("https://huggingface.co/api/models/{}", model_id);
+                match client.get(&api_url).send().await {
+                    Ok(r) => match r.json::<serde_json::Value>().await {
+                        Ok(json) => {
+                            let siblings = json["siblings"].as_array().cloned().unwrap_or_default();
+                            let rec_quant = &hw.recommended_quant;
+                            let max_ram = hw.max_model_ram_gb;
+                            let mut best_q: Option<String> = None;
+                            let mut fallback: Option<(f32, String)> = None;
+                            for s in &siblings {
+                                if let Some(fname) = s["rfilename"].as_str() {
+                                    if !fname.to_lowercase().ends_with(".gguf") { continue; }
+                                    let est_ram = estimate_ram_for_gguf(fname);
+                                    if est_ram > max_ram { continue; }
+                                    let q = extract_quant_label(fname);
+                                    if q.to_uppercase() == rec_quant.to_uppercase() {
+                                        best_q = Some(q);
+                                        break;
+                                    }
+                                    if fallback.as_ref().map_or(true, |(r, _)| est_ram > *r) {
+                                        fallback = Some((est_ram, q));
+                                    }
+                                }
+                            }
+                            best_q.or_else(|| fallback.map(|(_, q)| q))
+                                .map(|q| format!("hf.co/{}:{}", model_id, q))
+                                .unwrap_or_else(|| format!("hf.co/{}", model_id))
+                        }
+                        Err(_) => format!("hf.co/{}", model_id),
+                    },
+                    Err(_) => format!("hf.co/{}", model_id),
+                }
+            }
+        }
+        _ => model_id.clone(),
+    };
+
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(32);
+    let client_clone = client.clone();
+    let model_clone = ollama_model_id.clone();
+    let active_model_ref = state.active_model.clone();
+
+    tokio::spawn(async move {
+        {
+            let mut active = active_model_ref.lock().await;
+            *active = model_clone.clone();
+        }
+
+        let res = client_clone
+            .post(format!("{}/api/pull", OLLAMA_URL))
+            .json(&serde_json::json!({ "name": model_clone, "stream": true }))
+            .send()
+            .await;
+
+        let res = match res {
+            Ok(r) => r,
+            Err(e) => {
+                let _ = tx.send(Ok(Event::default().data(
+                    serde_json::json!({"status": "error", "message": e.to_string()}).to_string()
+                ))).await;
+                return;
+            }
+        };
+
+        let mut stream = res.bytes_stream();
+        let mut buffer = String::new();
+
+        while let Some(chunk) = stream.next().await {
+            let bytes = match chunk {
+                Ok(b) => b,
+                Err(_) => break,
+            };
+            buffer.push_str(&String::from_utf8_lossy(&bytes));
+
+            while let Some(pos) = buffer.find('\n') {
+                let line: String = buffer.drain(..=pos).collect();
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
+                    let status = v["status"].as_str().unwrap_or("").to_string();
+                    let completed = v["completed"].as_u64();
+                    let total = v["total"].as_u64();
+                    let percent = match (completed, total) {
+                        (Some(c), Some(t)) if t > 0 => Some((c as f64 / t as f64) * 100.0),
+                        _ => None,
+                    };
+                    let progress = PullProgress {
+                        status: status.clone(),
+                        completed,
+                        total,
+                        percent,
+                    };
+                    if let Ok(json) = serde_json::to_string(&progress) {
+                        if tx.send(Ok(Event::default().data(json))).await.is_err() {
+                            return;
+                        }
+                    }
+                    if status == "success" {
+                        return;
+                    }
+                }
+            }
+        }
+    });
+
+    Sse::new(ReceiverStream::new(rx)).into_response()
+}
+
+async fn uninstall_handler(
+    State(state): State<AppState>,
+    Json(payload): Json<UninstallRequest>,
+) -> impl IntoResponse {
+    let model_id = payload.model_id.trim().to_string();
+
+    if model_id.is_empty() {
+        return Json(UninstallResponse {
+            ok: false,
+            message: "ID modello vuoto.".to_string(),
+        })
+        .into_response();
+    }
+
+    if DEFAULT_MODELS.contains(&model_id.as_str()) {
+        return Json(UninstallResponse {
+            ok: false,
+            message: format!("'{}' è un modello di default e non può essere disinstallato.", model_id),
+        })
+        .into_response();
+    }
+
+    let client = state.client.clone();
+    let res = client
+        .delete(format!("{}/api/delete", OLLAMA_URL))
+        .json(&serde_json::json!({ "model": model_id }))
+        .send()
+        .await;
+
+    match res {
+        Ok(r) if r.status().is_success() => {
+            let mut active = state.active_model.lock().await;
+            if *active == model_id {
+                active.clear();
+            }
+            Json(UninstallResponse {
+                ok: true,
+                message: format!("Modello '{}' disinstallato.", model_id),
+            })
+            .into_response()
+        }
+        Ok(r) => {
+            let status = r.status();
+            let body = r.text().await.unwrap_or_default();
+            Json(UninstallResponse {
+                ok: false,
+                message: format!("Ollama ha risposto {}: {}", status, body),
+            })
+            .into_response()
+        }
+        Err(e) => Json(UninstallResponse {
+            ok: false,
+            message: format!("Errore connessione Ollama: {}", e),
+        })
+        .into_response(),
+    }
+}
+
 fn remove_markdown_fences(text: &str) -> String {
     let mut result = String::with_capacity(text.len());
     for line in text.lines() {
@@ -1197,14 +1438,11 @@ fn remove_markdown_fences(text: &str) -> String {
     result
 }
 
-// ============================================================
-// CHAT HANDLER
-// ============================================================
 async fn chat_handler(
     State(state): State<AppState>,
     Json(payload): Json<ChatRequest>,
 ) -> impl IntoResponse {
-        let prompt = match payload.prompt {
+    let prompt = match payload.prompt {
         Some(p) if !p.trim().is_empty() => p.trim().to_string(),
         _ => {
             return Response::builder()
@@ -1214,7 +1452,6 @@ async fn chat_handler(
         }
     };
 
-    // ── WordCraft ──
     if let Some(craft_response) = crate::wordcraft::try_wordcraft_action(&prompt).await {
         return Response::builder()
             .header("Content-Type", "text/plain; charset=utf-8")
@@ -1222,14 +1459,13 @@ async fn chat_handler(
             .unwrap();
     }
 
-    // ── GridCraft ──
     if let Some(craft_response) = crate::gridcraft::try_gridcraft_action(&prompt).await {
         return Response::builder()
             .header("Content-Type", "text/plain; charset=utf-8")
             .body(Body::from(craft_response))
             .unwrap();
     }
-    // WordCraft per testi lunghi
+
     if prompt.to_lowercase().contains("documento") && prompt.to_lowercase().contains("con:") {
         if let Some(craft_response) = crate::wordcraft::create_long_document(&prompt).await {
             return Response::builder()
@@ -1238,7 +1474,7 @@ async fn chat_handler(
                 .unwrap();
         }
     }
-    // ── PdfCraft ──
+
     if let Some(craft_response) = crate::pdfcraft::try_pdfcraft_action(&prompt).await {
         return Response::builder()
             .header("Content-Type", "text/plain; charset=utf-8")
@@ -1246,7 +1482,6 @@ async fn chat_handler(
             .unwrap();
     }
 
-   
     let use_uncensored = needs_uncensored(&prompt);
     let use_code = !use_uncensored && needs_code(&prompt);
     let security = !use_code && !use_uncensored && is_security_prompt(&prompt);
@@ -1274,13 +1509,10 @@ async fn chat_handler(
         *m = active_mode.to_string();
     }
 
-    // Data in fondo, senza parentesi quadre, senza "Contesto".
-// I modelli piccoli copiano i pattern tra [] → li evitiamo.
     let system_content = format!(
         "{}\n\nIMPORTANTE: non iniziare mai la risposta con un saluto (buongiorno, ciao, salve, ecc.). Rispondi direttamente alla domanda.",
         system_prompt
     );
-
 
     let mut messages = vec![ChatMessage {
         role: "system".to_string(),
@@ -1288,25 +1520,23 @@ async fn chat_handler(
     }];
 
     {
-    let hist = state.history.lock().await;
-    // MAX_HISTORY conta COPPIE (user+assistant) → 6 coppie = 12 messaggi
-    let max_msgs = MAX_HISTORY * 2;
-    let start = if hist.len() > max_msgs {
-        // Arrotonda per eccesso alla coppia: taglia SEMPRE da un "user"
-        let raw = hist.len() - max_msgs;
-        // Se il messaggio a `raw` è "assistant", sposta di +1 per partire da "user"
-        if raw < hist.len() && hist[raw].role == "assistant" {
-            raw + 1
+        let hist = state.history.lock().await;
+        let max_msgs = MAX_HISTORY * 2;
+        let start = if hist.len() > max_msgs {
+            let raw = hist.len() - max_msgs;
+            if raw < hist.len() && hist[raw].role == "assistant" {
+                raw + 1
+            } else {
+                raw
+            }
         } else {
-            raw
+            0
+        };
+        for msg in &hist[start..] {
+            messages.push(msg.clone());
         }
-    } else {
-        0
-    };
-    for msg in &hist[start..] {
-        messages.push(msg.clone());
     }
-}
+
     messages.push(ChatMessage {
         role: "user".to_string(),
         content: prompt.clone(),
@@ -1433,12 +1663,9 @@ async fn chat_handler(
         .unwrap()
 }
 
-// ============================================================
-// MAIN
-// ============================================================
 #[tokio::main]
 async fn main() {
-    println!("[*] Gideon AI v4 — rilevamento hardware...");
+    println!("[*] Gideon AI v4.1.4 — rilevamento hardware...");
     let hw = HardwareInfo::detect();
     println!(
         "[*] CPU: {} ({} core) | RAM libera: {:.1} GB | GPU: {}",
@@ -1464,11 +1691,13 @@ async fn main() {
         .route("/hw", get(hw_handler))
         .route("/models", get(models_handler))
         .route("/connect", post(connect_handler))
+        .route("/pull-stream", post(pull_stream_handler))
         .route("/hf-files", post(hf_files_handler))
+        .route("/uninstall-model", post(uninstall_handler))
         .with_state(state);
 
     let addr = format!("127.0.0.1:{}", PORT);
-    println!("[*] Gideon AI v4 in avvio su http://{}", addr);
+    println!("[*] Gideon AI v4.1.4 in avvio su http://{}", addr);
     let _ = webbrowser::open(&format!("http://localhost:{}", PORT));
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
