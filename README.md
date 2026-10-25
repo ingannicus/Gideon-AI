@@ -22,10 +22,18 @@ Smista automaticamente le richieste al modello più adatto:
 | Scrittura e analisi codice | `qwen2.5-coder:3b` |
 | Sicurezza informatica | `gemma3:4b` (system prompt dedicato) |
 | Modalità uncensored | `dolphin llama3.2-3b-uncensored` |
+| Modalità uncensored Pc Performant| `bartowski/Qwen2.5-Coder-14B-Instruct-abliterated-GGUF` <--incolla nel campo scansione di Gideon
 | Qualsiasi modello HuggingFace | scelto e scaricato in autonomia |
 
 ---
-
+v4.15
+ Quantizzazione automatica : Gideon analizza l'hardware e sceglie la quantizzazione GGUF migliore (Q8_0, Q6_K, Q5_K_M, Q4_K_M, ecc.) in base alla RAM disponibile.
+Disinstallazione modelli : nella barra laterale, accanto al menu dei modelli, c'è il pulsante 🗑 per rimuovere i modelli scaricati manualmente. I modelli di default (gemma3:4b, qwen2.5-coder:7b,) sono protetti e non possono essere eliminati.
+modelli modelli default : il backend blocca la disinstallazione dei modelli di sistema, anche se qualcuno chiama direttamente l'API /uninstall-model.
+💡 Ottimizzazione per PC ad alte prestazioni 💡
+Stai utilizzando una macchina con hardware avanzato o GPU dedicata? Il Connettore Universale integrato in Gideon-AI permette di interrogare direttamente Hugging Face e calibrare il carico in base all'hardware disponibile. Per PC più performanti dove servire più potenza, consiglio l'adozione del modello `bartowski/Qwen2.5-Coder-14B-Instruct-abliterated-GGUF`: otterrai risposte di altissima qualità, logica di programmazione superiore e zero restrizioni artificiali, rappresentando la scelta definitiva per chi cerca performance di livello enterprise direttamente in locale.
+Inoltre, utilizzando l'apposito tasto cestino nell'interfaccia, potrai rimuovere agilmente i vecchi modelli non più necessari, facendo spazio e mantenendo il sistema perfettamente pulito e ottimizzato per il nuovo motore.
+---
 ## Funzionalità v4
 
 ### 💻 Auto-Hardware Detection
