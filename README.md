@@ -72,7 +72,7 @@ Vantaggi
 
 Gestione dello spazio
 
-Grazie al nuovo sistema di disinstallazione integrato, è possibile rimuovere rapidamente i modelli non più utilizzati, mantenendo il sistema pulito, efficiente e pronto per ospitare modelli di dimensioni maggiori.
+## Grazie al nuovo sistema di disinstallazione integrato, è possibile rimuovere rapidamente i modelli non più utilizzati, mantenendo il sistema pulito, efficiente e pronto per ospitare modelli di dimensioni maggiori.
 ---
 ## Funzionalità v4
 
