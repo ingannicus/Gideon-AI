@@ -57,11 +57,11 @@ bartowski/Qwen2.5-Coder-14B-Instruct-abliterated-GGUF
 
 Vantaggi
 
- ✅ Migliore qualità nella programmazione
- ✅ Maggiore capacità di ragionamento
- ✅ Risposte più accurate e dettagliate
- ✅ Ottimizzato per workstation e PC ad alte prestazioni
- ✅ Utilizzo completamente locale
+  Migliore qualità nella programmazione
+  Maggiore capacità di ragionamento
+  Risposte più accurate e dettagliate
+  Ottimizzato per workstation e PC ad alte prestazioni
+  Utilizzo completamente locale
 ---
 ## Funzionalità v4
 
