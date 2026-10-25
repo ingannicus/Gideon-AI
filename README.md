@@ -32,9 +32,13 @@ Smista automaticamente le richieste al modello più adatto:
 Gideon AI analizza automaticamente l'hardware del sistema e seleziona la quantizzazione GGUF più adatta alle risorse disponibili. Tra le opzioni supportate:
 
 Q8_0
+
 Q6_K
+
 Q5_K_M
+
 Q4_K_M
+
 Altre varianti compatibili
 
 Questo permette di ottenere il miglior equilibrio tra qualità delle risposte, velocità e consumo di memoria, senza richiedere configurazioni manuali.
