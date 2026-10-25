@@ -26,13 +26,53 @@ Smista automaticamente le richieste al modello più adatto:
 | Qualsiasi modello HuggingFace | scelto e scaricato in autonomia |
 
 ---
-v4.15
- Quantizzazione automatica : Gideon analizza l'hardware e sceglie la quantizzazione GGUF migliore (Q8_0, Q6_K, Q5_K_M, Q4_K_M, ecc.) in base alla RAM disponibile.
-Disinstallazione modelli : nella barra laterale, accanto al menu dei modelli, c'è il pulsante 🗑 per rimuovere i modelli scaricati manualmente. I modelli di default (gemma3:4b, qwen2.5-coder:7b,) sono protetti e non possono essere eliminati.
-modelli modelli default : il backend blocca la disinstallazione dei modelli di sistema, anche se qualcuno chiama direttamente l'API /uninstall-model.
-💡 Ottimizzazione per PC ad alte prestazioni 💡
-Stai utilizzando una macchina con hardware avanzato o GPU dedicata? Il Connettore Universale integrato in Gideon-AI permette di interrogare direttamente Hugging Face e calibrare il carico in base all'hardware disponibile. Per PC più performanti dove servire più potenza, consiglio l'adozione del modello `bartowski/Qwen2.5-Coder-14B-Instruct-abliterated-GGUF`: otterrai risposte di altissima qualità, logica di programmazione superiore e zero restrizioni artificiali, rappresentando la scelta definitiva per chi cerca performance di livello enterprise direttamente in locale.
-Inoltre, utilizzando l'apposito tasto cestino nell'interfaccia, potrai rimuovere agilmente i vecchi modelli non più necessari, facendo spazio e mantenendo il sistema perfettamente pulito e ottimizzato per il nuovo motore.
+##🚀 Gideon AI v4.15
+⚡ Quantizzazione automatica intelligente
+
+Gideon AI analizza automaticamente l'hardware del sistema e seleziona la quantizzazione GGUF più adatta alle risorse disponibili. Tra le opzioni supportate:
+
+Q8_0
+Q6_K
+Q5_K_M
+Q4_K_M
+Altre varianti compatibili
+
+Questo permette di ottenere il miglior equilibrio tra qualità delle risposte, velocità e consumo di memoria, senza richiedere configurazioni manuali.
+
+🗑️ Gestione avanzata dei modelli
+
+È ora possibile rimuovere i modelli scaricati manualmente direttamente dall'interfaccia tramite il pulsante cestino presente nella barra laterale.
+
+Protezione dei modelli di sistema:
+
+gemma3:4b
+qwen2.5-coder:7b
+
+I modelli predefiniti sono protetti e non possono essere eliminati accidentalmente.
+
+🔒 Sicurezza lato backend
+
+La protezione dei modelli di sistema viene applicata anche dal backend. Qualsiasi tentativo di rimozione tramite API, inclusa la chiamata diretta a /uninstall-model, verrà automaticamente bloccato.
+
+💡 Ottimizzazione per Hardware ad Alte Prestazioni
+
+Se utilizzi un PC dotato di molta RAM, processore potente o GPU dedicata, il Connettore Universale integrato in Gideon AI può interrogare direttamente Hugging Face per individuare modelli più avanzati e ottimizzare automaticamente il carico di lavoro in base all'hardware disponibile.
+
+Per gli utenti che desiderano massimizzare la qualità della generazione di codice e del ragionamento logico, è consigliato il modello:
+
+bartowski/Qwen2.5-Coder-14B-Instruct-abliterated-GGUF
+
+Vantaggi
+
+✅ Migliore qualità nella programmazione
+ ✅ Maggiore capacità di ragionamento
+ ✅ Risposte più accurate e dettagliate
+ ✅ Ottimizzato per workstation e PC ad alte prestazioni
+ ✅ Utilizzo completamente locale
+
+Gestione dello spazio
+
+Grazie al nuovo sistema di disinstallazione integrato, è possibile rimuovere rapidamente i modelli non più utilizzati, mantenendo il sistema pulito, efficiente e pronto per ospitare modelli di dimensioni maggiori.
 ---
 ## Funzionalità v4
 
