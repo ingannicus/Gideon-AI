@@ -43,17 +43,6 @@ Questo permette di ottenere il miglior equilibrio tra qualità delle risposte, v
 
 È ora possibile rimuovere i modelli scaricati manualmente direttamente dall'interfaccia tramite il pulsante cestino presente nella barra laterale.
 
-Protezione dei modelli di sistema:
-
-gemma3:4b
-qwen2.5-coder:7b
-
-I modelli predefiniti sono protetti e non possono essere eliminati accidentalmente.
-
-🔒 Sicurezza lato backend
-
-La protezione dei modelli di sistema viene applicata anche dal backend. Qualsiasi tentativo di rimozione tramite API, inclusa la chiamata diretta a /uninstall-model, verrà automaticamente bloccato.
-
 💡 Ottimizzazione per Hardware ad Alte Prestazioni
 
 Se utilizzi un PC dotato di molta RAM, processore potente o GPU dedicata, il Connettore Universale integrato in Gideon AI può interrogare direttamente Hugging Face per individuare modelli più avanzati e ottimizzare automaticamente il carico di lavoro in base all'hardware disponibile.
@@ -64,15 +53,11 @@ bartowski/Qwen2.5-Coder-14B-Instruct-abliterated-GGUF
 
 Vantaggi
 
-✅ Migliore qualità nella programmazione
+ ✅ Migliore qualità nella programmazione
  ✅ Maggiore capacità di ragionamento
  ✅ Risposte più accurate e dettagliate
  ✅ Ottimizzato per workstation e PC ad alte prestazioni
  ✅ Utilizzo completamente locale
-
-Gestione dello spazio
-
-### Grazie al nuovo sistema di disinstallazione integrato, è possibile rimuovere rapidamente i modelli non più utilizzati, mantenendo il sistema pulito, efficiente e pronto per ospitare modelli di dimensioni maggiori.
 ---
 ## Funzionalità v4
 
