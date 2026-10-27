@@ -1,4 +1,4 @@
-@'
+'
 # 🚀 Gideon AI v4.0.0 — Note di rilascio
 
 **Data:** 23 ottobre 2026
