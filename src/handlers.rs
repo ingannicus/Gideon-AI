@@ -291,7 +291,7 @@ pub async fn connect_handler(
     Json(ConnectResponse {
         ok: true,
         message: format!(
-            "Pull avviato per '{}'. Sarà disponibile al completamento del download.",
+            "Pull avviato per '{}'. SarÃ  disponibile al completamento del download.",
             ollama_model_id
         ),
         model_id: ollama_model_id,
@@ -441,7 +441,7 @@ pub async fn uninstall_handler(
         return Json(UninstallResponse {
             ok: false,
             message: format!(
-                "'{}' è un modello di default e non può essere disinstallato.",
+                "'{}' Ã¨ un modello di default e non puÃ² essere disinstallato.",
                 model_id
             ),
         })

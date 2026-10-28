@@ -62,7 +62,7 @@ impl HardwareInfo {
 }
 
 pub fn best_quant_for_ram(ram_gb: f32) -> &'static str {
-    if ram_gb >= 12.0 { "Q8_0" }
+    if ram_gb >= 12.0 { "Q6_K" }
     else if ram_gb >= 8.0 { "Q6_K" }
     else if ram_gb >= 5.5 { "Q5_K_M" }
     else if ram_gb >= 3.5 { "Q4_K_M" }

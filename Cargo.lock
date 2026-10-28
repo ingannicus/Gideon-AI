@@ -468,7 +468,7 @@ dependencies = [
 
 [[package]]
 name = "gideon-ai"
-version = "5.0.0"
+version = "5.0.1"
 dependencies = [
  "axum",
  "dirs",

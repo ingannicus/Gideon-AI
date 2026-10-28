@@ -234,7 +234,7 @@
 
     <div class="main">
         <div class="topbar">
-            <span class="title">// GIDEON TERMINAL [RUST CORE v4.1.4]</span>
+            <span class="title">// GIDEON TERMINAL [RUST CORE v5.0.1]</span>
             <div class="topbar-hw" id="topbarHw">
                 <span>CPU <span class="val" id="tbCores">—</span></span>
                 <span>RAM libera <span class="val" id="tbRamFree">—</span></span>
@@ -243,7 +243,7 @@
             <span class="pill">ONLINE</span>
         </div>
         <div class="chat-container" id="chatContainer">
-            <div class="message ai-msg"><div class="answer">Ciao! Sono Gideon AI v4.1.4 — hardware detection, GGUF picker, barra di download e gestione modelli attivi. Come posso assisterti?</div></div>
+            <div class="message ai-msg"><div class="answer">Ciao! Sono Gideon AI v5.0.1 — hardware detection, GGUF picker, barra di download e gestione modelli attivi. Come posso assisterti?</div></div>
         </div>
         <div class="input-container">
             <div class="input-box">
@@ -251,7 +251,7 @@
                 <button id="actionBtn">Invia</button>
             </div>
         </div>
-        <div class="footer-author">Gideon AI v4.1.4 — <strong>Rocco Degiacomo</strong></div>
+        <div class="footer-author">Gideon AI v5.0.1 — <strong>Rocco Degiacomo</strong></div>
     </div>
 
 <script>
@@ -285,7 +285,7 @@
         const ty=cy+68;
         if(frame%120<6){const gx=(Math.random()*4)-2;ctx.fillStyle=magenta;ctx.fillText("GIDEON",cx+gx+1,ty);ctx.fillStyle=cyanBright;ctx.fillText("GIDEON",cx+gx-1,ty-2);}
         ctx.fillStyle=orange;ctx.fillText("GIDEON",cx,ty);
-        ctx.font="9px Consolas";ctx.fillStyle=cyanDim;ctx.fillText("HUD v4.1.4 // ONLINE",cx,ty+12);
+        ctx.font="9px Consolas";ctx.fillStyle=cyanDim;ctx.fillText("HUD v5.0.1 // ONLINE",cx,ty+12);
         requestAnimationFrame(draw);
     }
     draw();

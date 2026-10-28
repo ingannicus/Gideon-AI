@@ -32,19 +32,19 @@ fallback_to_heuristics = true
 # === PREFERENZE MODELLI PER TIER HARDWARE ===
 
 [model_preferences.high]
-general    = "gemma3:12b"
-code       = "qwen2.5-coder:14b"
-uncensored = "dolphin-mixtral:8x7b"
-security   = "gemma3:12b"
+general = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q6_K"
+code = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q6_K"
+security = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q6_K"
+uncensored = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q6_K"
 
 [model_preferences.mid]
-general    = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q6_K"
-code       = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q6_K"
+general = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q6_K"
+code = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q6_K"
+security = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q6_K"
 uncensored = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q6_K"
-security   = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q6_K"
 
 [model_preferences.low]
-general    = "llama3.2:1b"
-code       = "qwen2.5-coder:1.5b"
-uncensored = "llama3.2:1b"
-security   = "llama3.2:1b"
+general = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q6_K"
+code = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q6_K"
+security = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q6_K"
+uncensored = "hf.co/unsloth/gemma-3-4b-it-GGUF:Q6_K"
