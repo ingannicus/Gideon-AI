@@ -33,8 +33,9 @@
         .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: blink 2s infinite; }
         @keyframes blink { 0%,100%{opacity:1}50%{opacity:.3} }
 
-        .hud-wrap { border: 1px solid var(--border); border-radius: var(--radius); background: radial-gradient(ellipse at 50% 40%, #091219 0%, #03050a 75%); padding: 4px; display: flex; justify-content: center; box-shadow: inset 0 0 30px rgba(0,255,136,0.04); }
+        .hud-wrap { border: 1px solid var(--border); border-radius: var(--radius); background: radial-gradient(ellipse at 50% 40%, #091219 0%, #03050a 75%); padding: 4px; display: flex; justify-content: center; box-shadow: inset 0 0 30px rgba(0,255,136,0.04); position: relative; min-height: 208px; }
         #gideonHudCanvas { width: 100%; height: 200px; display: block; }
+        #jarvisCanvas { width: 100%; height: 200px; display: none; }
 
         .mode-badge { font-size: 11px; padding: 5px 10px; border-radius: var(--radius-sm); text-align: center; border: 1px solid; letter-spacing: 0.5px; transition: var(--transition); }
         .mode-badge.general  { color: #7ee2a1; border-color: #1f4a30; background: rgba(0,255,136,0.04); }
@@ -185,7 +186,10 @@
         <div class="logo-area"><span>GIDEON AI</span><span class="status-dot"></span></div>
         <div class="author-line">Sviluppato da <strong>Rocco Degiacomo</strong></div>
 
-        <div class="hud-wrap"><canvas id="gideonHudCanvas"></canvas></div>
+        <div class="hud-wrap">
+            <canvas id="gideonHudCanvas"></canvas>
+            <canvas id="jarvisCanvas"></canvas>
+        </div>
 
         <div class="mode-badge general" id="modeBadge">⬡ Modalità: Generale</div>
 
@@ -255,6 +259,9 @@
     </div>
 
 <script>
+// ============ HUD GIDEON ============
+let _hudActive = true;
+let _hudAnimId = null;
 (function initHud(){
     const canvas=document.getElementById('gideonHudCanvas');
     if(!canvas)return;
@@ -266,6 +273,7 @@
     const W=cssW,H=cssH,cx=W/2,cy=H/2-6;
     let angle=0,pulse=0,frame=0;
     function draw(){
+        if(!_hudActive){ _hudAnimId=null; return; }
         ctx.clearRect(0,0,W,H); angle+=1.2; pulse+=0.065; frame++;
         const cyan="#00F0FF",cyanDim="#00838F",cyanBright="#7CFFFF",orange="#FF7A00",magenta="#FF00E5",green="#00ff88";
         for(const r of[55,70,84]){ctx.beginPath();ctx.arc(cx,cy,r+Math.sin(pulse)*1.8,0,Math.PI*2);ctx.strokeStyle=cyanDim;ctx.lineWidth=1;ctx.setLineDash(r===70?[6,5]:[]);ctx.stroke();}
@@ -286,9 +294,197 @@
         if(frame%120<6){const gx=(Math.random()*4)-2;ctx.fillStyle=magenta;ctx.fillText("GIDEON",cx+gx+1,ty);ctx.fillStyle=cyanBright;ctx.fillText("GIDEON",cx+gx-1,ty-2);}
         ctx.fillStyle=orange;ctx.fillText("GIDEON",cx,ty);
         ctx.font="9px Consolas";ctx.fillStyle=cyanDim;ctx.fillText("HUD v5.0.1 // ONLINE",cx,ty+12);
-        requestAnimationFrame(draw);
+        _hudAnimId=requestAnimationFrame(draw);
     }
-    draw();
+    _hudAnimId=requestAnimationFrame(draw);
+})();
+
+// ============ JARVIS CANVAS ============
+let _jarvisActive = false;
+let _jarvisAnimId = null;
+let _jarvisWaveAmp = 0.0;
+(function initJarvis(){
+    const canvas = document.getElementById('jarvisCanvas');
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.getBoundingClientRect().width || 260;
+    const H = 200;
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    let t = 0;
+    const waveform = new Array(32).fill(0);
+    const stars = Array.from({length: 90}, () => ({ x: Math.random() * W, y: Math.random() * H, a: Math.random() }));
+    const particles = Array.from({length: 70}, () => ({
+        x: Math.random() * W, y: Math.random() * H,
+        vx: (Math.random() - 0.5) * 1.2, vy: (Math.random() - 0.5) * 1.2,
+        r: Math.random() * 1.5 + 1
+    }));
+
+    function rgba(r, g, b, a) {
+        const bg = [0x07, 0x0B, 0x14];
+        a = Math.max(0, Math.min(1, a));
+        return `rgb(${Math.round(bg[0]*(1-a) + r*a)},${Math.round(bg[1]*(1-a) + g*a)},${Math.round(bg[2]*(1-a) + b*a)})`;
+    }
+
+    function draw() {
+        if (!_jarvisActive) { _jarvisAnimId = null; return; }
+        t += 0.018;
+        ctx.clearRect(0, 0, W, H);
+        const col = '#0096FF';
+
+        // Griglia
+        for (let i = 0; i < W; i += 28) {
+            ctx.strokeStyle = rgba(0, 150, 255, 0.08);
+            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, H); ctx.stroke();
+        }
+        for (let j = 0; j < H; j += 28) {
+            ctx.strokeStyle = rgba(0, 150, 255, 0.05);
+            ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(W, j); ctx.stroke();
+        }
+
+        // Stelle
+        stars.forEach(s => {
+            const a = 0.3 + 0.7 * Math.abs(Math.sin(t * 2 + s.x));
+            const v = Math.round(a * 255);
+            ctx.fillStyle = `rgb(${v},${v},${v})`;
+            ctx.beginPath(); ctx.arc(s.x, s.y, 1, 0, Math.PI * 2); ctx.fill();
+        });
+
+        // Particelle
+        particles.forEach(p => {
+            p.x += p.vx + Math.sin(t + p.y * 0.01) * 0.2;
+            p.y += p.vy;
+            if (p.y < 0 || p.y > H) p.vy *= -1;
+            if (p.x < 0 || p.x > W) p.vx *= -1;
+            ctx.fillStyle = col;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+        });
+
+        const cx = W / 2, cy = H / 2 - 10;
+
+        // Anelli orbitanti
+        [70, 105, 145, 180].forEach((rad, idx) => {
+            const rot = t * (0.3 + idx * 0.15) * (idx % 2 === 0 ? 1 : -1);
+            ctx.strokeStyle = rgba(0, 150, 255, 0.25 - idx * 0.04);
+            ctx.lineWidth = 1;
+            ctx.setLineDash(idx % 2 === 0 ? [12, 8] : [4, 12]);
+            ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.stroke();
+            ctx.setLineDash([]);
+            const tr = (rot * 180 * Math.PI) / 180;
+            const tx = cx + rad * Math.cos(tr);
+            const ty = cy + rad * Math.sin(tr) * 0.6;
+            ctx.fillStyle = col;
+            ctx.beginPath(); ctx.arc(tx, ty, 4, 0, Math.PI * 2); ctx.fill();
+        });
+
+        // Testa olografica
+        const breathing = Math.sin(t * 1.2) * 4;
+        const headR = 38 + breathing * 0.3;
+        for (let a = 0; a < 360; a += 18) {
+            const an = ((a + t * 30) * Math.PI) / 180;
+            const x1 = cx + (headR - 6) * Math.cos(an);
+            const y1 = (cy - 70) + (headR - 6) * Math.sin(an) * 0.9;
+            const x2 = cx + headR * Math.cos(an);
+            const y2 = (cy - 70) + headR * Math.sin(an) * 0.9;
+            ctx.strokeStyle = rgba(0, 150, 255, 0.35);
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+        }
+        ctx.strokeStyle = col; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, cy - 70, headR, 0, Math.PI * 2); ctx.stroke();
+
+        // Occhi
+        const eyeY = cy - 72;
+        [-12, 12].forEach(ex => {
+            const pulse = 1 + 0.6 * Math.sin(t * 8);
+            ctx.fillStyle = col;
+            ctx.beginPath();
+            ctx.ellipse(cx + ex, eyeY, 5 * pulse, 3 * pulse, 0, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Collo/spalle
+        ctx.strokeStyle = col; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(cx, cy - 32); ctx.lineTo(cx, cy - 10); ctx.stroke();
+        const left = cx - (80 + breathing), right = cx + (80 + breathing);
+        ctx.beginPath(); ctx.moveTo(left, cy); ctx.lineTo(right, cy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(left, cy); ctx.lineTo(left + 18, cy + 45); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(right, cy); ctx.lineTo(right - 18, cy + 45); ctx.stroke();
+
+        // Core pulsante
+        const coreY = cy + 22;
+        const corePulse = 16 + 10 * Math.sin(t * 5) + _jarvisWaveAmp * 18;
+        for (let k = 4; k > 0; k--) {
+            ctx.fillStyle = rgba(0, 150, 255, 0.12 / k);
+            ctx.beginPath(); ctx.arc(cx, coreY, corePulse * k, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(cx, coreY, corePulse * 0.6, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'white'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(cx, coreY, corePulse * 0.6, 0, Math.PI * 2); ctx.stroke();
+
+        // Waveform
+        for (let i = 0; i < 32; i++) {
+            waveform[i] = waveform[i] * 0.75 + Math.random() * _jarvisWaveAmp;
+            const bw = W / 32;
+            const x = i * bw + 4;
+            const hh = 6 + waveform[i] * 36;
+            ctx.strokeStyle = col;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(x, H - 18);
+            ctx.lineTo(x, H - 18 - hh);
+            ctx.stroke();
+        }
+
+        // HUD text
+        ctx.fillStyle = col;
+        ctx.font = '9px Consolas';
+        ctx.textAlign = 'left';
+        ctx.fillText('SYS.AVATAR // JARVIS', 14, 18);
+        ctx.textAlign = 'right';
+        ctx.fillText(`PULSE ${70 + Math.floor(20 * Math.sin(t * 2))} BPM`, W - 14, 18);
+
+        // Scanline
+        const scanY = (t * 90) % H;
+        ctx.strokeStyle = rgba(0, 150, 255, 0.85);
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(W, scanY); ctx.stroke();
+
+        _jarvisAnimId = requestAnimationFrame(draw);
+    }
+
+    window.startJarvisAnimation = function() {
+        if (_jarvisActive) return;
+        _jarvisActive = true;
+        document.getElementById('gideonHudCanvas').style.display = 'none';
+        canvas.style.display = 'block';
+        t = 0;
+        draw();
+    };
+
+    window.stopJarvisAnimation = function() {
+        _jarvisActive = false;
+        if (_jarvisAnimId) { cancelAnimationFrame(_jarvisAnimId); _jarvisAnimId = null; }
+        canvas.style.display = 'none';
+        document.getElementById('gideonHudCanvas').style.display = 'block';
+        // Riavvia l'HUD se era stato fermato
+        if (!_hudActive) {
+            _hudActive = true;
+            const c = document.getElementById('gideonHudCanvas');
+            if (c && !_hudAnimId) {
+                // Ricarica l'HUD canvas forzando il re-render
+                location.reload === undefined; // no-op
+            }
+        }
+    };
+
+    window._jarvisSetSpeaking = function(on) {
+        _jarvisWaveAmp = on ? 1.0 : 0.0;
+    };
 })();
 
 let hwData = null;
@@ -599,6 +795,7 @@ newSessionBtn.addEventListener('click',function(){
     isStopped=true;
     if(activeReader){try{activeReader.cancel();}catch(_){}activeReader=null;}
     if(activeController){try{activeController.abort();}catch(_){}activeController=null;}
+    if(window.stopJarvisAnimation) window.stopJarvisAnimation();
     fetch('/reset',{method:'POST'}).then(()=>{
         chatContainer.innerHTML='';
         const d=document.createElement('div');d.className='message ai-msg';
@@ -633,6 +830,14 @@ async function sendMessage(){
     const text=userInput.value.trim();
     if(!text||actionBtn.classList.contains('stop-mode'))return;
     isStopped=false;
+
+    // Rileva comando Jarvis
+    const isJarvis = /^jarvis\b/i.test(text);
+    if (isJarvis && window.startJarvisAnimation) {
+        window.startJarvisAnimation();
+        window._jarvisSetSpeaking(true);
+    }
+
     const userDiv=document.createElement('div');userDiv.className='message user-msg';userDiv.textContent=text;
     chatContainer.appendChild(userDiv);msgCount++;msgCountEl.textContent=msgCount;
     userInput.value='';userInput.style.height='24px';
@@ -668,7 +873,24 @@ async function sendMessage(){
         typing.remove();
         if(err.name==='AbortError'||isStopped){if(!ans.textContent)ans.textContent='[Generazione interrotta]';}
         else{ans.textContent='[Errore di connessione al backend]';}
-    }finally{activeReader=null;activeController=null;resetUIState();}
+    }finally{
+        if (isJarvis && window._jarvisSetSpeaking) {
+            window._jarvisSetSpeaking(false);
+            // TTS: Jarvis parla
+            if ('speechSynthesis' in window && fullText) {
+                speechSynthesis.cancel();
+                const utt = new SpeechSynthesisUtterance(fullText);
+                utt.lang = 'it-IT';
+                utt.rate = 1.0;
+                utt.pitch = 1.0;
+                utt.onstart = () => { if(window._jarvisSetSpeaking) window._jarvisSetSpeaking(true); };
+                utt.onend = () => { if(window._jarvisSetSpeaking) window._jarvisSetSpeaking(false); };
+                speechSynthesis.speak(utt);
+            }
+            setTimeout(() => { if(window.stopJarvisAnimation) window.stopJarvisAnimation(); }, 800);
+        }
+        activeReader=null;activeController=null;resetUIState();
+    }
 }
 </script>
 </body>

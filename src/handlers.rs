@@ -510,7 +510,18 @@ async fn chat_handler_inner(
         Some(p) if !p.trim().is_empty() => p.trim().to_string(),
         _ => return Err(AppError::BadRequest("Prompt vuoto".to_string())),
     };
-
+    // === JARVIS: comandi di sistema ===
+    if prompt.to_lowercase().starts_with("jarvis") {
+        if let Some(resp) = crate::jarvis::handle_command(&prompt).await {
+            return Ok(Response::builder()
+                .status(axum::http::StatusCode::OK)
+                .header("Content-Type", "text/plain; charset=utf-8")
+                .header("X-Gideon-Mode", "jarvis")
+                .body(axum::body::Body::from(resp))
+                .unwrap());
+        }
+    }
+    // === FINE JARVIS ===
     if let Some(craft_response) =
         crate::wordcraft::try_wordcraft_action(&prompt, &state.config).await?
     {
@@ -529,8 +540,8 @@ async fn chat_handler_inner(
         {
             return Ok(text_response(craft_response));
         }
-    }
-
+		
+        }
     if let Some(craft_response) =
         crate::pdfcraft::try_pdfcraft_action(&prompt, &state.config).await?
     {

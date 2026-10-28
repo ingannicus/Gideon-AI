@@ -3,6 +3,7 @@ mod error;
 mod gridcraft;
 mod handlers;
 mod hardware;
+mod jarvis;
 mod llm;
 mod pdfcraft;
 mod state;

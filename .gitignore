@@ -1,12 +1,16 @@
-﻿/target
-**/target
-*.zip
-*.bak
-*.bak2
-*.bak_oggi
-*.back
-src/backup ok/
-Gideon2.png
-newgideon.png
+ # Build artifacts
+GideonAI_Export/
+GideonAI_Export.zip
 GideonAI_Export_Mac/
-GideonAI_Export/Gideon AI.exe
+GideonAI_Export_Mac.zip
+/target
+
+# File temporanei / note personali
+*.bak
+*.pre-fix
+comandi per pubblicare su git.txt
+deepseek_bat_*.bat
+# Immagini / backup / file non codice
+*.png
+*.back
+*.bak
